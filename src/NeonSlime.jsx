@@ -66,6 +66,7 @@ const NeonSlime = () => {
     sparks: [],
     particles: [],
     score: 0,
+    sparksCollected: 0,
     highScore: 0,
     gameOver: false,
     keys: {},
@@ -89,6 +90,7 @@ const NeonSlime = () => {
     state.platforms = [];
     state.trampolines = [];
     state.sparks = [];
+    state.sparksCollected = 0;
     state.particles = [];
 
     // Create initial platforms - tighter vertical (reachable in one jump) and horizontal (narrower band)
@@ -440,7 +442,7 @@ const NeonSlime = () => {
 
           if (dist < p.width / 2 + spark.radius) {
             spark.collected = true;
-            state.score += 100;
+            state.sparksCollected += 1;
 
             // Particle burst
             for (let i = 0; i < 20; i++) {
@@ -485,9 +487,10 @@ const NeonSlime = () => {
       const followSpeed = diff > 0 ? 0.022 : 0.055; // slower when moving up (player bounced), faster when falling
       state.camera.y += diff * followSpeed;
 
-      // Update score based on height (only trigger React update when value actually changes)
+      // Score: mix of height + coins, 3:1 emphasis on coins (100 pts per spark, ×3; height = 1 per 100px)
       const heightScore = Math.floor(Math.max(0, -p.y) / 100);
-      state.score = Math.max(state.score, heightScore);
+      const sparkScore = 100 * state.sparksCollected;
+      state.score = heightScore + 3 * sparkScore;
       if (state.score !== lastScoreDisplayed) {
         lastScoreDisplayed = state.score;
         setScore(state.score);
