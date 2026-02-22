@@ -213,8 +213,9 @@ const NeonSlime = () => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
-    // Game loop
+    // Game loop (use rafId so cleanup can cancel it — avoids double loop in React StrictMode dev)
     let lastTime = Date.now();
+    let rafId = 0;
 
     const gameLoop = () => {
       if (!canvas) return;
@@ -228,7 +229,7 @@ const NeonSlime = () => {
 
       if (state.gameOver) {
         render(ctx, canvas);
-        requestAnimationFrame(gameLoop);
+        rafId = requestAnimationFrame(gameLoop);
         return;
       }
 
@@ -238,7 +239,7 @@ const NeonSlime = () => {
       // Render
       render(ctx, canvas);
 
-      requestAnimationFrame(gameLoop);
+      rafId = requestAnimationFrame(gameLoop);
     };
 
     const update = (deltaTime, deltaMs) => {
@@ -745,9 +746,10 @@ const NeonSlime = () => {
       }
     };
 
-    gameLoop();
+    rafId = requestAnimationFrame(gameLoop);
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
