@@ -66,6 +66,7 @@ const NeonSlime = () => {
     sparks: [],
     particles: [],
     score: 0,
+    platformPoints: 0,
     sparksCollected: 0,
     highScore: 0,
     gameOver: false,
@@ -91,6 +92,7 @@ const NeonSlime = () => {
     state.trampolines = [];
     state.sparks = [];
     state.sparksCollected = 0;
+    state.platformPoints = 0;
     state.particles = [];
 
     // Create initial platforms - tighter vertical (reachable in one jump) and horizontal (narrower band)
@@ -102,9 +104,9 @@ const NeonSlime = () => {
       const x = HORIZONTAL_CENTER - HORIZONTAL_BAND / 2 + Math.random() * HORIZONTAL_BAND;
       const width = 120 + Math.random() * 100; // wider platforms (120–220) for easier landing
 
-      state.platforms.push({ x, y, width, height: 20 });
+      state.platforms.push({ x, y, width, height: 20, passed: false, trampolineUsed: false });
 
-      // Add trampolines occasionally
+      // Add trampolines occasionally (y = platform.y - 15 so platform is trampoline.y + 15)
       if (Math.random() > 0.7) {
         const tx = x + Math.random() * (width - 60);
         state.trampolines.push({ x: tx, y: y - 15, width: 60, height: 15 });
@@ -412,6 +414,13 @@ const NeonSlime = () => {
           p.vy = -Math.abs(p.vy) * s.TRAMPOLINE_BOOST;
           p.state = 'airborne';
 
+          // Mark the platform this trampoline belongs to (trampoline.y + 15 = platform.y)
+          const platform = state.platforms.find(
+            (pl) => Math.abs(pl.y - (trampoline.y + 15)) < 5 &&
+              trampoline.x >= pl.x - 20 && trampoline.x + trampoline.width <= pl.x + pl.width + 20
+          );
+          if (platform) platform.trampolineUsed = true;
+
           // Screen shake
           state.camera.shake = 15;
 
@@ -487,10 +496,16 @@ const NeonSlime = () => {
       const followSpeed = diff > 0 ? 0.022 : 0.055; // slower when moving up (player bounced), faster when falling
       state.camera.y += diff * followSpeed;
 
-      // Score: mix of height + coins, 3:1 emphasis on coins (100 pts per spark, ×3; height = 1 per 100px)
-      const heightScore = Math.floor(Math.max(0, -p.y) / 100);
-      const sparkScore = 100 * state.sparksCollected;
-      state.score = heightScore + 3 * sparkScore;
+      // Platform passed: player above platform = passed (2 pts; 10 pts if used bounce pad)
+      for (const platform of state.platforms) {
+        if (!platform.passed && p.y + p.height < platform.y) {
+          platform.passed = true;
+          state.platformPoints += platform.trampolineUsed ? 10 : 2;
+        }
+      }
+
+      // Score: platform points (2 per platform, 10 if bounce pad used) + coins (25 each)
+      state.score = state.platformPoints + 25 * state.sparksCollected;
       if (state.score !== lastScoreDisplayed) {
         lastScoreDisplayed = state.score;
         setScore(state.score);
@@ -515,7 +530,7 @@ const NeonSlime = () => {
         const newX = 400 - 160 + Math.random() * 320; // same 320px band so next platform is reachable
         const newWidth = 120 + Math.random() * 100;
 
-        state.platforms.push({ x: newX, y: newY, width: newWidth, height: 20 });
+        state.platforms.push({ x: newX, y: newY, width: newWidth, height: 20, passed: false, trampolineUsed: false });
 
         // Add trampoline
         if (Math.random() > 0.7) {
