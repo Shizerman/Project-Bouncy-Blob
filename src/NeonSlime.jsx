@@ -1,8 +1,47 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Settings } from 'lucide-react';
+
+const DEFAULT_SETTINGS = {
+  GRAVITY: 0.5,
+  MAX_FALL_SPEED: 15,
+  MOVE_SPEED: 3,
+  MOVE_ACCELERATION: 0.22,
+  GROUND_FRICTION: 0.82,
+  JUMP_POWER_BASE: 12,
+  JUMP_POWER_MAX: 18,
+  CHARGE_TIME_MAX: 30,
+  DASH_SPEED: 15,
+  DASH_DURATION: 200,
+  DASH_COOLDOWN: 3000,
+  WALL_SLIDE_GRAVITY: 0.25,
+  WALL_JUMP_POWER_X: 10,
+  WALL_JUMP_POWER_Y: 15,
+  TRAMPOLINE_BOOST: 1.5,
+  WATER_OFFSET: 600,
+};
+
+const SETTINGS_CONFIG = [
+  { key: 'GRAVITY', label: 'Gravity', min: 0.2, max: 1.2, step: 0.05 },
+  { key: 'MAX_FALL_SPEED', label: 'Max fall speed', min: 8, max: 25, step: 1 },
+  { key: 'MOVE_SPEED', label: 'Move speed', min: 1, max: 6, step: 0.1 },
+  { key: 'MOVE_ACCELERATION', label: 'Move acceleration', min: 0.1, max: 0.5, step: 0.01 },
+  { key: 'GROUND_FRICTION', label: 'Ground friction', min: 0.5, max: 0.98, step: 0.02 },
+  { key: 'JUMP_POWER_BASE', label: 'Jump power (min)', min: 6, max: 18, step: 0.5 },
+  { key: 'JUMP_POWER_MAX', label: 'Jump power (max)', min: 12, max: 26, step: 0.5 },
+  { key: 'CHARGE_TIME_MAX', label: 'Charge time (frames)', min: 15, max: 50, step: 1 },
+  { key: 'DASH_SPEED', label: 'Dash speed', min: 8, max: 25, step: 0.5 },
+  { key: 'DASH_DURATION', label: 'Dash duration (ms)', min: 100, max: 400, step: 50 },
+  { key: 'DASH_COOLDOWN', label: 'Dash cooldown (ms)', min: 1000, max: 6000, step: 500 },
+  { key: 'WALL_SLIDE_GRAVITY', label: 'Wall slide gravity', min: 0.1, max: 0.5, step: 0.05 },
+  { key: 'WALL_JUMP_POWER_X', label: 'Wall jump (horizontal)', min: 5, max: 15, step: 0.5 },
+  { key: 'WALL_JUMP_POWER_Y', label: 'Wall jump (vertical)', min: 10, max: 22, step: 0.5 },
+  { key: 'TRAMPOLINE_BOOST', label: 'Trampoline boost', min: 1.1, max: 2.2, step: 0.1 },
+  { key: 'WATER_OFFSET', label: 'Water distance (death zone)', min: 500, max: 800, step: 50 },
+];
 
 const NeonSlime = () => {
   const canvasRef = useRef(null);
+  const settingsRef = useRef({ ...DEFAULT_SETTINGS });
   const gameStateRef = useRef({
     player: {
       x: 400,
@@ -37,24 +76,11 @@ const NeonSlime = () => {
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });
 
-  // Constants
-  const GRAVITY = 0.5;
-  const MAX_FALL_SPEED = 15;
-  const MOVE_SPEED = 3; // max horizontal speed (reached by holding left/right)
-  const MOVE_ACCELERATION = 0.22; // per frame - gives fine control; tap = small nudge
-  const GROUND_FRICTION = 0.82; // when not pressing left/right, vx decays quickly
-  const JUMP_POWER_BASE = 12;
-  const JUMP_POWER_MAX = 18;
-  const CHARGE_TIME_MAX = 30;
-  const DASH_SPEED = 15;
-  const DASH_DURATION = 200;
-  const DASH_COOLDOWN = 3000;
-  const WALL_SLIDE_GRAVITY = 0.25;
-  const WALL_JUMP_POWER_X = 10;
-  const WALL_JUMP_POWER_Y = 15;
-  const TRAMPOLINE_BOOST = 1.5;
-  const WATER_OFFSET = 600;
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // Initialize platforms and collectibles
   const initializeGame = () => {
@@ -153,10 +179,11 @@ const NeonSlime = () => {
         if (e.repeat) return; // ignore key repeat so we don't double-trigger wall jump
 
         // Wall jump
+        const sKey = settingsRef.current;
         if (state.player.state === 'sliding') {
           state.player.state = 'airborne';
-          state.player.vy = -WALL_JUMP_POWER_Y;
-          state.player.vx = state.player.wallSide === 'left' ? WALL_JUMP_POWER_X : -WALL_JUMP_POWER_X;
+          state.player.vy = -sKey.WALL_JUMP_POWER_Y;
+          state.player.vx = state.player.wallSide === 'left' ? sKey.WALL_JUMP_POWER_X : -sKey.WALL_JUMP_POWER_X;
           state.player.wallSide = null;
 
           // Screen shake
@@ -177,22 +204,21 @@ const NeonSlime = () => {
       }
 
       // Dash
+      const s = settingsRef.current;
       if (e.key === 'Shift' && state.player.dashCooldown <= 0 && state.player.state !== 'grounded') {
         state.player.state = 'dashing';
-        state.player.dashCooldown = DASH_COOLDOWN;
+        state.player.dashCooldown = s.DASH_COOLDOWN;
         state.player.dashStartTime = Date.now();
 
-        // Determine dash direction
         const dashLeft = state.keys['a'] || state.keys['arrowleft'];
         const dashRight = state.keys['d'] || state.keys['arrowright'];
 
         if (dashLeft && !dashRight) {
-          state.player.vx = -DASH_SPEED;
+          state.player.vx = -s.DASH_SPEED;
         } else if (dashRight && !dashLeft) {
-          state.player.vx = DASH_SPEED;
+          state.player.vx = s.DASH_SPEED;
         } else {
-          // Default to facing direction
-          state.player.vx = state.player.vx >= 0 ? DASH_SPEED : -DASH_SPEED;
+          state.player.vx = state.player.vx >= 0 ? s.DASH_SPEED : -s.DASH_SPEED;
         }
       }
     };
@@ -203,7 +229,8 @@ const NeonSlime = () => {
 
       // Jump release (normalize space key for all browsers)
       if (isSpace(e.key) && state.player.state === 'grounded') {
-        const jumpPower = JUMP_POWER_BASE + (state.player.chargeTime / CHARGE_TIME_MAX) * (JUMP_POWER_MAX - JUMP_POWER_BASE);
+        const sJump = settingsRef.current;
+        const jumpPower = sJump.JUMP_POWER_BASE + (state.player.chargeTime / sJump.CHARGE_TIME_MAX) * (sJump.JUMP_POWER_MAX - sJump.JUMP_POWER_BASE);
         state.player.vy = -jumpPower;
         state.player.state = 'airborne';
         state.player.chargeTime = 0;
@@ -243,60 +270,54 @@ const NeonSlime = () => {
     };
 
     const update = (deltaTime, deltaMs) => {
+      const s = settingsRef.current;
       const p = state.player;
       state.time += deltaTime;
 
-      // Increase difficulty gradually
       state.difficulty = 1 + state.time / 3000;
 
-      // Dash cooldown (use real time so it feels the same at any FPS)
       if (p.dashCooldown > 0) {
         p.dashCooldown -= deltaMs;
       }
 
-      // Check if dash duration ended
-      if (p.state === 'dashing' && Date.now() - p.dashStartTime > DASH_DURATION) {
+      if (p.state === 'dashing' && Date.now() - p.dashStartTime > s.DASH_DURATION) {
         p.state = 'airborne';
       }
 
-      // Jump charging (only when grounded and space held; use deltaTime so charge rate is same at any FPS)
       if (p.state === 'grounded' && state.keys[' ']) {
-        p.chargeTime = Math.min(p.chargeTime + deltaTime, CHARGE_TIME_MAX);
-        p.squashY = 0.7 - (p.chargeTime / CHARGE_TIME_MAX) * 0.3;
-        p.squashX = 1.3 + (p.chargeTime / CHARGE_TIME_MAX) * 0.3;
+        p.chargeTime = Math.min(p.chargeTime + deltaTime, s.CHARGE_TIME_MAX);
+        p.squashY = 0.7 - (p.chargeTime / s.CHARGE_TIME_MAX) * 0.3;
+        p.squashX = 1.3 + (p.chargeTime / s.CHARGE_TIME_MAX) * 0.3;
       } else {
         p.chargeTime = 0;
       }
 
-      // Horizontal movement: acceleration-based for fine control (tap = small move, hold = build speed)
       if (p.state !== 'dashing') {
         const moveLeft = state.keys['a'] || state.keys['arrowleft'];
         const moveRight = state.keys['d'] || state.keys['arrowright'];
 
         if (moveLeft && !moveRight) {
-          p.vx -= MOVE_ACCELERATION * deltaTime;
-          p.vx = Math.max(p.vx, -MOVE_SPEED);
+          p.vx -= s.MOVE_ACCELERATION * deltaTime;
+          p.vx = Math.max(p.vx, -s.MOVE_SPEED);
         } else if (moveRight && !moveLeft) {
-          p.vx += MOVE_ACCELERATION * deltaTime;
-          p.vx = Math.min(p.vx, MOVE_SPEED);
+          p.vx += s.MOVE_ACCELERATION * deltaTime;
+          p.vx = Math.min(p.vx, s.MOVE_SPEED);
         } else {
-          // No input: friction so you don't slide off
-          p.vx *= Math.pow(GROUND_FRICTION, deltaTime);
+          p.vx *= Math.pow(s.GROUND_FRICTION, deltaTime);
           if (Math.abs(p.vx) < 0.08) p.vx = 0;
         }
       }
 
-      // Apply gravity based on state
       if (p.state === 'grounded') {
         p.vy = 0;
       } else if (p.state === 'sliding') {
-        p.vy += WALL_SLIDE_GRAVITY;
-        p.vy = Math.min(p.vy, MAX_FALL_SPEED / 2);
+        p.vy += s.WALL_SLIDE_GRAVITY;
+        p.vy = Math.min(p.vy, s.MAX_FALL_SPEED / 2);
       } else if (p.state === 'dashing') {
-        p.vy = 0; // No gravity during dash
+        p.vy = 0;
       } else {
-        p.vy += GRAVITY;
-        p.vy = Math.min(p.vy, MAX_FALL_SPEED);
+        p.vy += s.GRAVITY;
+        p.vy = Math.min(p.vy, s.MAX_FALL_SPEED);
       }
 
       // Update position
@@ -386,7 +407,7 @@ const NeonSlime = () => {
             p.y + p.height > trampoline.y &&
             p.y + p.height < trampoline.y + trampoline.height + 10 &&
             p.vy > 0) {
-          p.vy = -Math.abs(p.vy) * TRAMPOLINE_BOOST;
+          p.vy = -Math.abs(p.vy) * s.TRAMPOLINE_BOOST;
           p.state = 'airborne';
 
           // Screen shake
@@ -514,7 +535,7 @@ const NeonSlime = () => {
       state.sparks = state.sparks.filter(s => s.y < cullBelowY);
 
       // Death zone (water at bottom of screen)
-      const waterY = state.camera.y + WATER_OFFSET;
+      const waterY = state.camera.y + s.WATER_OFFSET;
       if (p.y + p.height > waterY) {
         state.gameOver = true;
         setGameOver(true);
@@ -526,6 +547,7 @@ const NeonSlime = () => {
     };
 
     const render = (ctx, canvas) => {
+      const sRender = settingsRef.current;
       const cameraY = state.camera.y;
       const shakeX = (Math.random() - 0.5) * state.camera.shake;
       const shakeY = (Math.random() - 0.5) * state.camera.shake;
@@ -652,8 +674,8 @@ const NeonSlime = () => {
       ctx.restore();
 
       // Dash cooldown indicator (brightness)
-      if (p.dashCooldown > 0 && p.dashCooldown < DASH_COOLDOWN) {
-        const cooldownPercent = p.dashCooldown / DASH_COOLDOWN;
+      if (p.dashCooldown > 0 && p.dashCooldown < sRender.DASH_COOLDOWN) {
+        const cooldownPercent = p.dashCooldown / sRender.DASH_COOLDOWN;
         ctx.globalAlpha = 0.5;
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -665,7 +687,7 @@ const NeonSlime = () => {
       }
 
       // Water death zone
-      const waterY = cameraY + WATER_OFFSET;
+      const waterY = cameraY + sRender.WATER_OFFSET;
       const waterGradient = ctx.createLinearGradient(0, waterY, 0, waterY + 100);
       waterGradient.addColorStop(0, 'rgba(0, 212, 255, 0.3)');
       waterGradient.addColorStop(1, 'rgba(0, 150, 255, 0.6)');
@@ -755,41 +777,54 @@ const NeonSlime = () => {
     };
   }, []);
 
+  const updateSetting = (key, value) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const resetSettings = () => setSettings({ ...DEFAULT_SETTINGS });
+
   return (
     <div style={{
       width: '100%',
-      height: '100vh',
+      minHeight: '100vh',
       background: 'linear-gradient(180deg, #0a0a1a 0%, #1a0a2e 100%)',
       display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection: 'row',
       fontFamily: '"Courier New", monospace',
       color: '#00ff88',
     }}>
+      {/* Game area */}
       <div style={{
-        marginBottom: '20px',
-        textAlign: 'center',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
       }}>
-        <h1 style={{
-          fontSize: '48px',
-          fontWeight: 'bold',
-          margin: '0 0 10px 0',
-          textShadow: '0 0 20px #00d4ff',
-          color: '#00d4ff',
-          letterSpacing: '3px',
+        <div style={{
+          marginBottom: '20px',
+          textAlign: 'center',
         }}>
-          NEON SLIME
-        </h1>
-        <p style={{
-          fontSize: '20px',
-          margin: 0,
-          color: '#00ff88',
-          textShadow: '0 0 10px #00ff88',
-        }}>
-          Shadow Ascent
-        </p>
-      </div>
+          <h1 style={{
+            fontSize: '48px',
+            fontWeight: 'bold',
+            margin: '0 0 10px 0',
+            textShadow: '0 0 20px #00d4ff',
+            color: '#00d4ff',
+            letterSpacing: '3px',
+          }}>
+            NEON SLIME
+          </h1>
+          <p style={{
+            fontSize: '20px',
+            margin: 0,
+            color: '#00ff88',
+            textShadow: '0 0 10px #00ff88',
+          }}>
+            Shadow Ascent
+          </p>
+        </div>
 
       <canvas
         ref={canvasRef}
@@ -863,6 +898,79 @@ const NeonSlime = () => {
         <div style={{marginTop: '10px', color: '#ff4444'}}>
           ⚠️ Don&apos;t fall into the neon water below!
         </div>
+      </div>
+      </div>
+
+      {/* Settings sidebar */}
+      <div style={{
+        width: '300px',
+        minWidth: '300px',
+        maxHeight: '100vh',
+        overflowY: 'auto',
+        padding: '16px',
+        background: 'rgba(0, 0, 0, 0.6)',
+        borderLeft: '2px solid #00d4ff',
+        boxShadow: '-4px 0 20px rgba(0, 212, 255, 0.2)',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '16px',
+          color: '#00d4ff',
+          fontSize: '18px',
+          fontWeight: 'bold',
+        }}>
+          <Settings size={22} />
+          Settings
+        </div>
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px', lineHeight: 1.4 }}>
+          Tweak these and see how the game feels. Changes apply live while playing.
+        </p>
+        {SETTINGS_CONFIG.map(({ key, label, min, max, step }) => (
+          <div key={key} style={{ marginBottom: '14px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              color: '#00ff88',
+              marginBottom: '4px',
+            }}>
+              {label}: {typeof settings[key] === 'number' && settings[key] % 1 !== 0
+                ? settings[key].toFixed(2)
+                : settings[key]}
+            </label>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={settings[key]}
+              onChange={(e) => updateSetting(key, parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                accentColor: '#00d4ff',
+              }}
+            />
+          </div>
+        ))}
+        <button
+          onClick={resetSettings}
+          style={{
+            marginTop: '12px',
+            width: '100%',
+            padding: '10px',
+            fontSize: '14px',
+            fontFamily: '"Courier New", monospace',
+            fontWeight: 'bold',
+            background: 'rgba(0, 212, 255, 0.2)',
+            border: '2px solid #00d4ff',
+            borderRadius: '6px',
+            color: '#00d4ff',
+            cursor: 'pointer',
+          }}
+        >
+          Reset to defaults
+        </button>
       </div>
     </div>
   );
