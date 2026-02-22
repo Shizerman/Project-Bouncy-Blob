@@ -135,8 +135,10 @@ const NeonSlime = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: false });
     const state = gameStateRef.current;
+    let lastScoreDisplayed = -1;
+    let lastHighScoreDisplayed = -1;
 
     initializeGame();
 
@@ -218,7 +220,8 @@ const NeonSlime = () => {
       if (!canvas) return;
 
       const currentTime = Date.now();
-      const deltaTime = Math.min((currentTime - lastTime) / 16.67, 2);
+      const deltaMs = currentTime - lastTime;
+      const deltaTime = Math.min(deltaMs / 16.67, 2);
       lastTime = currentTime;
 
       const state = gameStateRef.current;
@@ -229,8 +232,8 @@ const NeonSlime = () => {
         return;
       }
 
-      // Update game state
-      update(deltaTime);
+      // Update game state (deltaTime = frame units @60fps, deltaMs = real milliseconds)
+      update(deltaTime, deltaMs);
 
       // Render
       render(ctx, canvas);
@@ -238,16 +241,16 @@ const NeonSlime = () => {
       requestAnimationFrame(gameLoop);
     };
 
-    const update = (deltaTime) => {
+    const update = (deltaTime, deltaMs) => {
       const p = state.player;
       state.time += deltaTime;
 
       // Increase difficulty gradually
       state.difficulty = 1 + state.time / 3000;
 
-      // Dash cooldown
+      // Dash cooldown (use real time so it feels the same at any FPS)
       if (p.dashCooldown > 0) {
-        p.dashCooldown -= 16.67;
+        p.dashCooldown -= deltaMs;
       }
 
       // Check if dash duration ended
@@ -255,9 +258,9 @@ const NeonSlime = () => {
         p.state = 'airborne';
       }
 
-      // Jump charging (only when grounded and space held)
+      // Jump charging (only when grounded and space held; use deltaTime so charge rate is same at any FPS)
       if (p.state === 'grounded' && state.keys[' ']) {
-        p.chargeTime = Math.min(p.chargeTime + 1, CHARGE_TIME_MAX);
+        p.chargeTime = Math.min(p.chargeTime + deltaTime, CHARGE_TIME_MAX);
         p.squashY = 0.7 - (p.chargeTime / CHARGE_TIME_MAX) * 0.3;
         p.squashX = 1.3 + (p.chargeTime / CHARGE_TIME_MAX) * 0.3;
       } else {
@@ -460,10 +463,17 @@ const NeonSlime = () => {
       const followSpeed = diff > 0 ? 0.022 : 0.055; // slower when moving up (player bounced), faster when falling
       state.camera.y += diff * followSpeed;
 
-      // Update score based on height
+      // Update score based on height (only trigger React update when value actually changes)
       const heightScore = Math.floor(Math.max(0, -p.y) / 100);
       state.score = Math.max(state.score, heightScore);
-      setScore(state.score);
+      if (state.score !== lastScoreDisplayed) {
+        lastScoreDisplayed = state.score;
+        setScore(state.score);
+      }
+      if (state.highScore !== lastHighScoreDisplayed) {
+        lastHighScoreDisplayed = state.highScore;
+        setHighScore(state.highScore);
+      }
 
       // Screen shake decay
       if (state.camera.shake > 0) {
@@ -551,10 +561,9 @@ const NeonSlime = () => {
         ctx.strokeStyle = '#1a1a2e';
       }
 
-      // Draw trampolines
+      // Draw trampolines (moderate shadow for performance on slower devices)
       for (const trampoline of state.trampolines) {
-        // Glowing effect
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 12;
         ctx.shadowColor = '#00d4ff';
 
         ctx.fillStyle = '#00d4ff';
@@ -577,7 +586,7 @@ const NeonSlime = () => {
       // Draw sparks (collectibles)
       for (const spark of state.sparks) {
         if (!spark.collected) {
-          ctx.shadowBlur = 15;
+          ctx.shadowBlur = 10;
           ctx.shadowColor = '#ffff00';
 
           ctx.fillStyle = '#ffff00';
@@ -615,8 +624,8 @@ const NeonSlime = () => {
       ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
       ctx.scale(p.squashX, p.squashY);
 
-      // Glow effect
-      ctx.shadowBlur = 25;
+      // Glow effect (reduced blur for smoother FPS on all devices)
+      ctx.shadowBlur = 14;
       ctx.shadowColor = '#00ff88';
 
       // Main blob
@@ -682,11 +691,11 @@ const NeonSlime = () => {
       ctx.restore();
 
       // UI overlay
-      // Score
+      // Score (minimal shadow for UI text)
       ctx.fillStyle = '#00ff88';
       ctx.font = 'bold 32px "Courier New", monospace';
       ctx.textAlign = 'left';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 4;
       ctx.shadowColor = '#00ff88';
       ctx.fillText(`SCORE: ${state.score}`, 20, 50);
 
@@ -716,7 +725,7 @@ const NeonSlime = () => {
         ctx.fillStyle = '#00d4ff';
         ctx.font = 'bold 60px "Courier New", monospace';
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 8;
         ctx.shadowColor = '#00d4ff';
         ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 50);
 
