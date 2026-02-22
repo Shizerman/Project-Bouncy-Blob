@@ -414,12 +414,20 @@ const NeonSlime = () => {
           p.vy = -Math.abs(p.vy) * s.TRAMPOLINE_BOOST;
           p.state = 'airborne';
 
-          // Mark the platform this trampoline belongs to (trampoline.y + 15 = platform.y)
+          // Mark the platform this trampoline belongs to and award 10 pts (you get 10 for using bounce pad)
           const platform = state.platforms.find(
             (pl) => Math.abs(pl.y - (trampoline.y + 15)) < 5 &&
               trampoline.x >= pl.x - 20 && trampoline.x + trampoline.width <= pl.x + pl.width + 20
           );
-          if (platform) platform.trampolineUsed = true;
+          if (platform) {
+            platform.trampolineUsed = true;
+            if (!platform.passed) {
+              platform.passed = true;
+              state.platformPoints += 10;
+            } else {
+              state.platformPoints += 8; // already gave 2 when we passed above; top up to 10
+            }
+          }
 
           // Screen shake
           state.camera.shake = 15;
